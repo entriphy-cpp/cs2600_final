@@ -14,6 +14,6 @@ endif
 
 all: ticTacToe
 ticTacToe:
-	$(CC) $(CFLAGS) src/*.c -o bin/tictactoe
+	$(CC) $(CFLAGS) src/*.c src/mqtt/*.c -o bin/tictactoe
 clean:
 	$(DELETE) $(DELPATH)
