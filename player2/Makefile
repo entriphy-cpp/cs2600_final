@@ -1,5 +1,6 @@
 CC=gcc
-CFLAGS=-Iinclude -Iinclude/mqtt-c
+CFLAGS=-Iinclude
+LFLAGS=-lpaho-mqtt3c
 ifeq ($(OS), Windows_NT) # Windows
 	DELETE=del
 	DELPATH=bin\\**
@@ -14,6 +15,6 @@ endif
 
 all: ticTacToe
 ticTacToe:
-	$(CC) $(CFLAGS) src/*.c src/mqtt-c/*.c -o bin/tictactoe
+	$(CC) $(CFLAGS) src/*.c $(LFLAGS) -o bin/tictactoe
 clean:
 	$(DELETE) $(DELPATH)

@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "mqtt-c/mqtt.h"
+#include <MQTTClient.h>
 
 int main(int argc, char const *argv[]) {
     printf("Hello world!\n");
