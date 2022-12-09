@@ -1,6 +1,9 @@
 #include <IRremoteESP8266.h>
 #include <IRrecv.h>
 #include <IRutils.h>
+#include "ir_remote.h"
+
+extern int keyToInt(int key);
 
 const uint16_t recvPin = 15;
 IRrecv irrecv(recvPin);
@@ -37,13 +40,10 @@ void setup() {
 
 void loop() {
   if (irrecv.decode(&results)) {
-    if (((results.value & 0xFF0000) >> 16) == 0xFF && (results.value & 0xFFFF) != 0xFFFF) {
-      Serial.println("Valid!");
-    } else {
-      Serial.println("Invalid.");
+    int key = keyToInt(results.value);
+    if (key != -1) {
+      Serial.println(key, HEX);
     }
-    Serial.println(results.value, HEX);
-    Serial.println();
     irrecv.resume();
   }
 
@@ -58,6 +58,7 @@ void loop() {
   refreshScreen();
   delay(5);
 }
+
 
 void refreshScreen()
 { 
