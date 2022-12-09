@@ -5,6 +5,7 @@
 #include <WiFi.h>
 #include "ir_remote.h"
 #include "mqtt_config.h"
+#include "opcodes.h"
 #include "wifi_secrets.h"
 
 extern int keyToInt(int key);
@@ -74,8 +75,13 @@ void setup() {
 void loop() {
   if (irrecv.decode(&results)) {
     int key = keyToInt(results.value);
-    if (key != -1) {
-      Serial.println(key, HEX);
+    if (key == 0) {
+      char payload[] = { PLAYER_1_ASK };
+      if (client.publish(TOPIC, payload)) {
+        Serial.println("Sent PLAYER_1_ASK!");
+      } else {
+        Serial.println("Failed to send PLAYER_1_ASK.");
+      }
     }
     irrecv.resume();
   }
