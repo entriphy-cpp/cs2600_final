@@ -7,10 +7,17 @@
 int messageReceived(void* context, char* topic, int length, MQTTClient_message* message) {
     if (strcmp(topic, TOPIC) == 0 && message->payloadlen == 1 && *((char*)message->payload) == PLAYER_1_ASK) {
         printf("Received PLAYER_1_ASK!\n", topic, length, message->payload);
+        int res = system(getenv("EXECUTABLE"));
+        printf("Executable exited with code %d.\n", res);
     }
 }
 
 int main(int argc, char* argv[]) {
+    if (getenv("EXECUTABLE") == NULL) {
+        printf("No executable was set in the EXECUTABLE environment variable.\n");
+        return EXIT_FAILURE;
+    }
+
     // Initialize MQTT
     MQTTClient client;
     MQTTClient_connectOptions conn_opts = MQTTClient_connectOptions_initializer;
