@@ -16,5 +16,7 @@ endif
 all: ticTacToe
 ticTacToe:
 	$(CC) $(CFLAGS) src/*.c $(LFLAGS) -o bin/tictactoe
+daemon:
+	$(CC) $(CFLAGS) src/daemon/*.c $(LFLAGS) -o bin/tictactoe-daemon
 clean:
 	$(DELETE) $(DELPATH)
