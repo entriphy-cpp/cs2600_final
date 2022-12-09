@@ -13,7 +13,7 @@ else
 	endif
 endif
 
-all: ticTacToe
+all: ticTacToe daemon
 ticTacToe:
 	$(CC) $(CFLAGS) src/*.c $(LFLAGS) -o bin/tictactoe
 daemon:
