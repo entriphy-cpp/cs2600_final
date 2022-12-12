@@ -1,0 +1,7 @@
+enum GameState {
+    PLAYER_1_IDLE,
+    PLAYER_1_WAITING,
+    PLAYER_1_DISPLAY_PLAYER,
+    PLAYER_1_MOVING,
+    PLAYER_2_MOVING
+};
