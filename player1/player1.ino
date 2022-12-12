@@ -38,6 +38,7 @@ enum GameState game_state;
 long timeout_time;
 byte *current_payload;
 bool isCpu = false;
+bool isQuit = false;
 enum Mark { empty = ' ', p1 = 'X', p2 = 'O'};
 enum Mark board[3][3] = {
     empty, empty, empty,
@@ -139,7 +140,21 @@ void loop() {
             } else {
                 lcdPrint("Player 1 Move", "Cannot place", true);
             }
+          } else if (key == 10) {
+            char payload = PLAYER_1_QUIT;
+            client.publish(P2_TOPIC, &payload);
+            isQuit = true;
+            updateState(PLAYER_2_WIN);
           }
+          break;
+        case PLAYER_2_MOVING:
+          if (key == 10) {
+            char payload = PLAYER_1_QUIT;
+            client.publish(P2_TOPIC, &payload);
+            isQuit = true;
+            updateState(PLAYER_2_WIN);
+          }
+          break;
       }
     }
 
@@ -159,8 +174,8 @@ void loop() {
       break;
     case PLAYER_1_WAITING:
       if (asyncDelay(10)) {
-        char payload[] = { PLAYER_1_TIMEOUT };
-        client.publish(P2_TOPIC, payload);
+        char payload = PLAYER_1_TIMEOUT;
+        client.publish(P2_TOPIC, &payload);
         lcdPrint("P2: Timeout", "Playing vs. CPU!", true);
         updateState(PLAYER_1_DISPLAY_PLAYER);
         isCpu = true;
@@ -192,33 +207,28 @@ void loop() {
       break;
     case PLAYER_2_MOVING:
       lcdPrint("Player 2 Move", "Waiting...", true);
-      if (current_payload != NULL && current_payload[0] == PLAYER_2_MOVE) {
-        pPlayerMove move = (pPlayerMove)current_payload;
-        board[move->row][move->column] = p2;
-        updateBoardDisplay();
-        totalMoves++;
-        checkWinner();
-        if (game_state != PLAYER_1_WIN && game_state != PLAYER_2_WIN && game_state != PLAYER_TIE && game_state != PLAYER_1_QUIT && game_state != PLAYER_2_QUIT)
-            updateState(game_state == PLAYER_1_MOVING ? PLAYER_2_MOVING : PLAYER_1_MOVING);
+      if (current_payload != NULL && (current_payload[0] == PLAYER_2_MOVE || current_payload[0] == PLAYER_2_QUIT)) {
+        if (current_payload[0] == PLAYER_2_QUIT) {
+          updateState(PLAYER_1_WIN);
+          isQuit = true;
+        } else {
+          pPlayerMove move = (pPlayerMove)current_payload;
+          board[move->row][move->column] = p2;
+          updateBoardDisplay();
+          totalMoves++;
+          checkWinner();
+          if (game_state != PLAYER_1_WIN && game_state != PLAYER_2_WIN && game_state != PLAYER_TIE)
+              updateState(game_state == PLAYER_1_MOVING ? PLAYER_2_MOVING : PLAYER_1_MOVING);
+        }
       }
       break;
     case PLAYER_1_WIN:
-      lcdPrint("Player 1 wins!", "", true);
+      lcdPrint("Player 1 wins!", isQuit ? "Player 2 quit :(" : "", true);
       if (asyncDelay(5))
         resetGame();
       break;
     case PLAYER_2_WIN:
-      lcdPrint("Player 2 wins!", "", true);
-      if (asyncDelay(5))
-        resetGame();
-      break;
-    case PLAYER_1_QUIT:
-      lcdPrint("Player 1 quit.", ":(", true);
-      if (asyncDelay(5))
-        resetGame();
-      break;
-    case PLAYER_2_QUIT:
-      lcdPrint("Player 2 quit.", ":(", true);
+      lcdPrint("Player 2 wins!", isQuit ? "Player 1 quit :(" : "", true);
       if (asyncDelay(5))
         resetGame();
       break;
@@ -287,6 +297,7 @@ void resetGame() {
   timeout_time = millis();
   current_payload = NULL;
   isCpu = false;
+  isQuit = false;
   idleBoard();
 }
 

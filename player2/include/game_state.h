@@ -6,7 +6,5 @@ enum GameState {
     PLAYER_2_MOVING,
     PLAYER_1_WIN,
     PLAYER_2_WIN,
-    PLAYER_1_QUIT,
-    PLAYER_2_QUIT,
     PLAYER_TIE
 };

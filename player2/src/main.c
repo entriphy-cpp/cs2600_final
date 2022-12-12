@@ -1,4 +1,5 @@
 #include <MQTTClient.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -6,6 +7,9 @@
 #include "input.h"
 #include "mqtt_config.h"
 #include "opcodes.h"
+
+MQTTClient client;
+MQTTClient_deliveryToken dt;
 
 // Game state
 enum GameState game_state;
@@ -26,15 +30,22 @@ int messageReceived(void* context, char* topic, int length, MQTTClient_message* 
             case PLAYER_1_TIMEOUT:
                 exit(1);
                 break;
+            case PLAYER_1_QUIT:
+                printf("PLAYER 2 WINS\n");
+                printf("Player 1 quit.\n");
+                sleep(5);
+                exit(0);
+                break;
         }
     }
 }
 
+// Blocks until a message from Player 1 is received
 void waitForMessage() {
     while (current_payload == NULL);
 }
 
-void setState(enum GameState state) {
+void updateState(enum GameState state) {
     game_state = state;
     current_payload = NULL;
 }
@@ -53,6 +64,7 @@ char getPlayerMark() {
     return game_state == PLAYER_1_MOVING ? p1 : p2;
 }
 
+// Gets move from player
 void playerMove(pPlayerMove move) {
     int row = integerInputRange("Enter row: ", 1, 3);
     int column = integerInputRange("Enter column: ", 1, 3);
@@ -93,10 +105,10 @@ int checkDiagonals() {
         (board[0][2] == mark && board[1][1] == mark && board[2][0] == mark);
 }
 
-// Returns 1 or 2 if the specified player won (-1 if tie, 0 if no winner)
+// Updates game_state if there is a winner
 void checkWinner() {
     if (totalMoves == 9) {
-        setState(PLAYER_TIE);
+        updateState(PLAYER_TIE);
         return;
     }
 
@@ -104,15 +116,25 @@ void checkWinner() {
     int columnWin = checkColumn(0) || checkColumn(1) || checkColumn(2);
     int diagonalWin = checkDiagonals();
     if (rowWin || columnWin || diagonalWin) {
-        game_state = game_state == PLAYER_1_MOVING ? PLAYER_1_WIN : PLAYER_2_WIN;
+        updateState(game_state == PLAYER_1_MOVING ? PLAYER_1_WIN : PLAYER_2_WIN);
     }
+}
+
+void signalHandler(int dummy) {
+    if (game_state == PLAYER_1_MOVING || game_state == PLAYER_2_MOVING) {
+        char payload = PLAYER_2_QUIT;
+        MQTTClient_publish(client, P1_TOPIC, 3, &payload, QOS, 0, &dt);
+        MQTTClient_waitForCompletion(client, dt, 3000);
+    }
+
+    MQTTClient_disconnect(client, 10000);
+    MQTTClient_destroy(&client);
+    exit(0);
 }
 
 int main(int argc, char* argv[]) {
     // Initialize MQTT
-    MQTTClient client;
     MQTTClient_connectOptions conn_opts = MQTTClient_connectOptions_initializer;
-    MQTTClient_deliveryToken dt;
     MQTTClient_create(&client, ADDRESS, CLIENT_ID, MQTTCLIENT_PERSISTENCE_NONE, NULL);
     MQTTClient_setCallbacks(client, NULL, NULL, messageReceived, NULL); // TODO: Handle failed/lost connection
     conn_opts.keepAliveInterval = 20;
@@ -125,30 +147,31 @@ int main(int argc, char* argv[]) {
         exit(EXIT_FAILURE);
     }
     MQTTClient_subscribe(client, P2_TOPIC, QOS);
-    char payload_buffer[20];
+    signal(SIGINT, signalHandler); // Player presses Ctrl + C
+    signal(SIGHUP, signalHandler); // Player closes window
 
     // Ask user if they want to play tic-tac-toe
     int response = booleanInput("Would you like to play tic-tac-toe? (y/n): ");
     if (!response) {
         // User answered no; publish response and quit
-        payload_buffer[0] = PLAYER_2_DENY;
-        MQTTClient_publish(client, P1_TOPIC, 1, payload_buffer, QOS, 0, &dt);
+        char payload = PLAYER_2_DENY;
+        MQTTClient_publish(client, P1_TOPIC, 1, &payload, QOS, 0, &dt);
         MQTTClient_disconnect(client, 10000);
         MQTTClient_destroy(&client);
         return 0;
     } else {
-        payload_buffer[0] = PLAYER_2_CONFIRM;
-        MQTTClient_publish(client, P1_TOPIC, 1, payload_buffer, QOS, 0, &dt);
+        char payload = PLAYER_2_CONFIRM;
+        MQTTClient_publish(client, P1_TOPIC, 1, &payload, QOS, 0, &dt);
     }
 
     // Wait for Player 1 to decide who goes first
     printf("Waiting for response from Player 1...\n");
     waitForMessage();
     pInitGame init = (pInitGame)current_payload;
-    setState(init->first_player == 1 ? PLAYER_1_MOVING : PLAYER_2_MOVING);
+    updateState(init->first_player == 1 ? PLAYER_1_MOVING : PLAYER_2_MOVING);
 
     // Game loop
-    while (game_state != PLAYER_1_WIN && game_state != PLAYER_2_WIN && game_state != PLAYER_TIE && game_state != PLAYER_1_QUIT && game_state != PLAYER_2_QUIT) {
+    while (game_state != PLAYER_1_WIN && game_state != PLAYER_2_WIN && game_state != PLAYER_TIE) {
         printBoard();
         printf("=======\n");
         printf("PLAYER %d MOVE (%c)\n", game_state - 2, getPlayerMark());
@@ -164,16 +187,18 @@ int main(int argc, char* argv[]) {
         }
         totalMoves++;
         checkWinner();
-        if (game_state != PLAYER_1_WIN && game_state != PLAYER_2_WIN && game_state != PLAYER_TIE && game_state != PLAYER_1_QUIT && game_state != PLAYER_2_QUIT)
-            setState(game_state == PLAYER_1_MOVING ? PLAYER_2_MOVING : PLAYER_1_MOVING);
+        if (game_state != PLAYER_1_WIN && game_state != PLAYER_2_WIN && game_state != PLAYER_TIE)
+            updateState(game_state == PLAYER_1_MOVING ? PLAYER_2_MOVING : PLAYER_1_MOVING);
     }
+
+    printBoard();
 
     if (game_state == PLAYER_TIE) {
         printf("TIE GAME\n");
     } else {
         printf("WINNER: PLAYER %d\n", game_state == PLAYER_1_WIN ? 1 : 2);
     }
-    sleep(3);
+    sleep(5);
 
     MQTTClient_disconnect(client, 10000);
     MQTTClient_destroy(&client);

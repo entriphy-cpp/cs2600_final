@@ -44,6 +44,8 @@ int keyToInt(int key) {
       return 8;
     case IR_9:
       return 9;
+    case IR_POWER:
+      return 10;
     default:
       return -1;
   }
