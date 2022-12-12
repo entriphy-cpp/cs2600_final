@@ -34,7 +34,7 @@ WiFiClient wifi_client;
 PubSubClient client(wifi_client);
 
 // Game state
-enum GameState state;
+enum GameState game_state;
 long timeout_time;
 byte *current_payload;
 bool isCpu = false;
@@ -44,6 +44,7 @@ enum Mark board[3][3] = {
     empty, empty, empty,
     empty, empty, empty
 };
+int totalMoves = 0;
 
 void setup() {
   Serial.begin(115200);
@@ -109,7 +110,7 @@ void loop() {
   if (irrecv.decode(&results)) {
     int key = keyToInt(results.value);
     if (key != -1) {
-      switch (state) {
+      switch (game_state) {
         case PLAYER_1_IDLE:
           if (key == 0) {
             char payload[] = { PLAYER_1_ASK };
@@ -122,6 +123,23 @@ void loop() {
             }
           }
           break;
+        case PLAYER_1_MOVING:
+          if (key >= 1 && key <= 9) {
+            key--;
+            int row = key / 3;
+            int column = key % 3;
+            if (board[row][column] == empty) {
+                board[row][column] = p1;
+                updateBoardDisplay();
+                PlayerMove move = { PLAYER_1_MOVE, row, column };
+                client.publish(P2_TOPIC, (char *)&move);
+                checkWinner();
+                if (game_state != PLAYER_1_WIN && game_state != PLAYER_2_WIN && game_state != PLAYER_TIE && game_state != PLAYER_1_QUIT && game_state != PLAYER_2_QUIT)
+                  updateState(game_state == PLAYER_1_MOVING ? PLAYER_2_MOVING : PLAYER_1_MOVING);
+            } else {
+                lcdPrint("Player 1 Move", "Cannot place", true);
+            }
+          }
       }
     }
 
@@ -136,7 +154,7 @@ void loop() {
     pixels[x][y] = s.endsWith("!") ? LOW : HIGH;
   }
 
-  switch (state) {
+  switch (game_state) {
     case PLAYER_1_IDLE:
       break;
     case PLAYER_1_WAITING:
@@ -151,6 +169,7 @@ void loop() {
           lcdPrint(current_payload[0] == PLAYER_2_CONFIRM ? "P2: Confirm" : "P2: Deny", current_payload[0] == PLAYER_2_CONFIRM ? "Playing vs. P2!" : "Playing vs. CPU!", true);
           isCpu = current_payload[0] == PLAYER_2_DENY;
           updateState(PLAYER_1_DISPLAY_PLAYER);
+          updateBoardDisplay();
         } else {
           // Print number of seconds to LCD
           char buf[2];
@@ -167,6 +186,36 @@ void loop() {
         lcdPrint("Player", itoa(first_player, buf, 10), true);
         updateState(first_player == 1 ? PLAYER_1_MOVING : PLAYER_2_MOVING);
       }
+      break;
+    case PLAYER_1_MOVING:
+      lcdPrint("Player 1 Move", "Press a # (1-9)", true);
+      break;
+    case PLAYER_2_MOVING:
+      lcdPrint("Player 2 Move", "Waiting...", true);
+      if (current_payload != NULL && current_payload[0] == PLAYER_2_MOVE) {
+        pPlayerMove move = (pPlayerMove)current_payload;
+        board[move->row][move->column] = p2;
+        updateBoardDisplay();
+        totalMoves++;
+        checkWinner();
+        if (game_state != PLAYER_1_WIN && game_state != PLAYER_2_WIN && game_state != PLAYER_TIE && game_state != PLAYER_1_QUIT && game_state != PLAYER_2_QUIT)
+            updateState(game_state == PLAYER_1_MOVING ? PLAYER_2_MOVING : PLAYER_1_MOVING);
+      }
+      break;
+    case PLAYER_1_WIN:
+      lcdPrint("Player 1 wins!", "", true);
+      break;
+    case PLAYER_2_WIN:
+      lcdPrint("Player 2 wins!", "", true);
+      break;
+    case PLAYER_1_QUIT:
+      lcdPrint("Player 1 quit.", ":(", true);
+      break;
+    case PLAYER_2_QUIT:
+      lcdPrint("Player 2 quit.", ":(", true);
+      break;
+    case PLAYER_TIE:
+      lcdPrint("Tie game.", "", true);
       break;
   }
 
@@ -193,28 +242,38 @@ void callback(char *topic, byte *payload, unsigned int length) {
   }
 }
 
+const char *old_row1;
+const char *old_row2;
 void lcdPrint(const char *row1, const char *row2, int clear) {
-  if (clear)
+  if (clear && (old_row1 != row1 || old_row2 != row2))
     lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print(row1);
-  lcd.setCursor(0, 1);
-  lcd.print(row2);
+  
+  if (old_row1 != row1) {
+    lcd.setCursor(0, 0);
+    lcd.print(row1);
+    old_row1 = row1;
+  }
+
+  if (old_row2 != row2) {
+    lcd.setCursor(0, 1);
+    lcd.print(row2);
+    old_row2 = row2;
+  }
 }
 
 int asyncDelay(int timeout) {
   return millis() > (timeout_time + timeout * 1000);
 }
 
-void updateState(enum GameState game_state) {
-  state = game_state;
+void updateState(enum GameState state) {
+  game_state = state;
   timeout_time = millis();
   current_payload = NULL;
 }
 
 void resetGame() {
   lcdPrint("Press 0 to play!", "", true);
-  state = PLAYER_1_IDLE;
+  game_state = PLAYER_1_IDLE;
   timeout_time = millis();
   current_payload = NULL;
   isCpu = false;
@@ -246,6 +305,67 @@ void idleBoard() {
   pixels[6][5] = HIGH;
 }
 
+void updateBoardDisplay() {
+  resetBoard();
+  for (int x = 0; x < 3; x++) {
+    for (int y = 0; y < 3; y++) {
+      if (board[x][y] != empty) {
+        int row = x * 3;
+        int column = y * 3;
+        pixels[row + 1][column] = HIGH;
+        pixels[row][column + 1] = HIGH;
+        if (board[x][y] == p2) {
+          pixels[row][column] = HIGH;
+          pixels[row + 1][column + 1] = HIGH;
+        }
+      }
+    }
+  }
+}
+
 void resetBoard() {
-  memset(pixels, 0x00, 64);
+  for (int x = 0; x < 8; x++) {
+    for (int y = 0; y < 8; y++) {
+      pixels[x][y] = LOW;
+    }
+  }
+}
+
+// Gets the mark character for the current player (defined in Mark enum)
+char getPlayerMark() {
+    return game_state == PLAYER_1_MOVING ? p1 : p2;
+}
+
+// Checks if the specified player has won by having all marks in a specific row
+int checkRow(int row) {
+    char mark = getPlayerMark();
+    return board[row][0] == mark && board[row][1] == mark && board[row][2] == mark;
+}
+
+// Checks if the specified player has won by having all marks in a specific column
+int checkColumn(int column) {
+    char mark = getPlayerMark();
+    return board[0][column] == mark && board[1][column] == mark && board[2][column] == mark;
+}
+
+// Checks if the player has won via diagonal
+int checkDiagonals() {
+    char mark = getPlayerMark();
+    return (board[0][0] == mark && board[1][1] == mark && board[2][2] == mark) ||
+        (board[0][2] == mark && board[1][1] == mark && board[2][0] == mark);
+}
+
+// Returns 1 or 2 if the specified player won (-1 if tie, 0 if no winner)
+void checkWinner() {
+    if (totalMoves == 9) {
+        updateState(PLAYER_TIE);
+        return;
+    }
+
+    int rowWin = checkRow(0) || checkRow(1) || checkRow(2);
+    int columnWin = checkColumn(0) || checkColumn(1) || checkColumn(2);
+    int diagonalWin = checkDiagonals();
+    if (rowWin || columnWin || diagonalWin) {
+        game_state = game_state == PLAYER_1_MOVING ? PLAYER_1_WIN : PLAYER_2_WIN;
+    }
 }
