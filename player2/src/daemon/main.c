@@ -6,7 +6,7 @@
 
 int messageReceived(void* context, char* topic, int length, MQTTClient_message* message) {
     printf("%d\n", message->payloadlen);
-    if (strcmp(topic, P2_TOPIC) == 0 && message->payloadlen == 1 && *((char*)message->payload) == PLAYER_1_ASK) {
+    if (strcmp(topic, P2_TOPIC) == 0 && message->payloadlen > 0 && *((char*)message->payload) == PLAYER_1_ASK) {
         printf("Received PLAYER_1_ASK!\n", topic, length, message->payload);
         int res = system(getenv("EXECUTABLE"));
         printf("Executable exited with code %d.\n", res);
