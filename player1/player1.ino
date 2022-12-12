@@ -38,6 +38,12 @@ enum GameState state;
 long timeout_time;
 byte *current_payload;
 bool isCpu = false;
+enum Mark { empty = ' ', p1 = 'X', p2 = 'O'};
+enum Mark board[3][3] = {
+    empty, empty, empty,
+    empty, empty, empty,
+    empty, empty, empty
+};
 
 void setup() {
   Serial.begin(115200);

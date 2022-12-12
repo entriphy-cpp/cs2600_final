@@ -8,6 +8,13 @@
 #include "opcodes.h"
 
 char *current_payload = NULL;
+enum Mark { empty = ' ', p1 = 'X', p2 = 'O'};
+enum Mark board[3][3] = {
+    empty, empty, empty,
+    empty, empty, empty,
+    empty, empty, empty
+};
+
 
 int messageReceived(void* context, char* topic, int length, MQTTClient_message* message) {
     if (strcmp(topic, P2_TOPIC) == 0 && message->payloadlen > 0) {
