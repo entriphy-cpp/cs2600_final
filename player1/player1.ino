@@ -39,7 +39,6 @@ long timeout_time;
 byte *current_payload;
 bool isCpu = false;
 bool isQuit = false;
-enum Mark { empty = ' ', p1 = 'X', p2 = 'O'};
 enum Mark board[3][3] = {
     empty, empty, empty,
     empty, empty, empty,
@@ -219,13 +218,17 @@ void loop() {
       break;
     case PLAYER_1_MOVING:
       // Wait for player to press input on remote
+      if (current_payload != NULL && current_payload[0] == PLAYER_2_QUIT) {
+        isQuit = true;
+        updateState(PLAYER_1_WIN);
+      }
       break;
     case PLAYER_2_MOVING:
       if (!isCpu) {
         if (current_payload != NULL && (current_payload[0] == PLAYER_2_MOVE || current_payload[0] == PLAYER_2_QUIT)) {
           if (current_payload[0] == PLAYER_2_QUIT) {
-            updateState(PLAYER_1_WIN);
             isQuit = true;
+            updateState(PLAYER_1_WIN);
           } else {
             pPlayerMove move = (pPlayerMove)current_payload;
             board[move->row][move->column] = p2;

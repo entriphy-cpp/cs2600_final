@@ -8,3 +8,5 @@ enum GameState {
     PLAYER_2_WIN,
     PLAYER_TIE
 };
+
+enum Mark { empty = ' ', p1 = 'X', p2 = 'O'};
