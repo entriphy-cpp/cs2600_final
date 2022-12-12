@@ -144,8 +144,8 @@ void loop() {
       } else {
         if (current_payload != NULL && (current_payload[0] == PLAYER_2_CONFIRM || current_payload[0] == PLAYER_2_DENY)) {
           lcdPrint(current_payload[0] == PLAYER_2_CONFIRM ? "P2: Confirm" : "P2: Deny", current_payload[0] == PLAYER_2_CONFIRM ? "Playing vs. P2!" : "Playing vs. CPU!", true);
-          updateState(PLAYER_1_DISPLAY_PLAYER);
           isCpu = current_payload[0] == PLAYER_2_DENY;
+          updateState(PLAYER_1_DISPLAY_PLAYER);
         } else {
           char buf[2];
           lcdPrint("", itoa((millis() - timeout_time) / 1000, buf, 10), false);
