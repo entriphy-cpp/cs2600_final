@@ -107,7 +107,10 @@ void setup() {
 }
 
 void loop() {
+  // Required to keep MQTT connection alive
   client.loop();
+
+  // Received input from IR remote
   if (irrecv.decode(&results)) {
     int key = keyToInt(results.value);
     if (key != -1) {
@@ -132,8 +135,11 @@ void loop() {
             if (board[row][column] == empty) {
                 board[row][column] = p1;
                 updateBoardDisplay();
-                PlayerMove move = { PLAYER_1_MOVE, row, column };
-                client.publish(P2_TOPIC, (char *)&move);
+                if (!isCpu) {
+                  PlayerMove move = { PLAYER_1_MOVE, row, column };
+                  client.publish(P2_TOPIC, (char *)&move);
+                }
+                totalMoves++;
                 checkWinner();
                 if (game_state != PLAYER_1_WIN && game_state != PLAYER_2_WIN && game_state != PLAYER_TIE && game_state != PLAYER_1_QUIT && game_state != PLAYER_2_QUIT)
                   updateState(game_state == PLAYER_1_MOVING ? PLAYER_2_MOVING : PLAYER_1_MOVING);
@@ -141,16 +147,20 @@ void loop() {
                 lcdPrint("Player 1 Move", "Cannot place", true);
             }
           } else if (key == 10) {
-            char payload = PLAYER_1_QUIT;
-            client.publish(P2_TOPIC, &payload);
+            if (!isCpu) {
+              char payload = PLAYER_1_QUIT;
+              client.publish(P2_TOPIC, &payload);
+            }
             isQuit = true;
             updateState(PLAYER_2_WIN);
           }
           break;
         case PLAYER_2_MOVING:
           if (key == 10) {
-            char payload = PLAYER_1_QUIT;
-            client.publish(P2_TOPIC, &payload);
+            if (!isCpu) {
+              char payload = PLAYER_1_QUIT;
+              client.publish(P2_TOPIC, &payload);
+            }
             isQuit = true;
             updateState(PLAYER_2_WIN);
           }
@@ -161,6 +171,7 @@ void loop() {
     irrecv.resume();
   }
 
+  // Serial debug for 8x8 matrix
   if (Serial.available() > 0) {
     String s = Serial.readString();
     s.trim();
@@ -169,19 +180,23 @@ void loop() {
     pixels[x][y] = s.endsWith("!") ? LOW : HIGH;
   }
 
+  // Game loop
   switch (game_state) {
     case PLAYER_1_IDLE:
+      // Waiting for play to press 0 on remote
       break;
     case PLAYER_1_WAITING:
       if (asyncDelay(10)) {
+        // Player 2 did not respond to request
         char payload = PLAYER_1_TIMEOUT;
         client.publish(P2_TOPIC, &payload);
         lcdPrint("P2: Timeout", "Playing vs. CPU!", true);
         updateState(PLAYER_1_DISPLAY_PLAYER);
+        updateBoardDisplay();
         isCpu = true;
       } else {
         if (current_payload != NULL && (current_payload[0] == PLAYER_2_CONFIRM || current_payload[0] == PLAYER_2_DENY)) {
-          lcdPrint(current_payload[0] == PLAYER_2_CONFIRM ? "P2: Confirm" : "P2: Deny", current_payload[0] == PLAYER_2_CONFIRM ? "Playing vs. P2!" : "Playing vs. CPU!", true);
+          lcdPrint(current_payload[0] == PLAYER_2_CONFIRM ? "P2: Confirmed" : "P2: Denied", current_payload[0] == PLAYER_2_CONFIRM ? "Playing vs. P2!" : "Playing vs. CPU!", true);
           isCpu = current_payload[0] == PLAYER_2_DENY;
           updateState(PLAYER_1_DISPLAY_PLAYER);
           updateBoardDisplay();
@@ -203,24 +218,41 @@ void loop() {
       }
       break;
     case PLAYER_1_MOVING:
+      // Wait for player to press input on remote
       lcdPrint("Player 1 Move", "Press a # (1-9)", true);
       break;
     case PLAYER_2_MOVING:
       lcdPrint("Player 2 Move", "Waiting...", true);
-      if (current_payload != NULL && (current_payload[0] == PLAYER_2_MOVE || current_payload[0] == PLAYER_2_QUIT)) {
-        if (current_payload[0] == PLAYER_2_QUIT) {
-          updateState(PLAYER_1_WIN);
-          isQuit = true;
-        } else {
-          pPlayerMove move = (pPlayerMove)current_payload;
-          board[move->row][move->column] = p2;
-          updateBoardDisplay();
-          totalMoves++;
-          checkWinner();
-          if (game_state != PLAYER_1_WIN && game_state != PLAYER_2_WIN && game_state != PLAYER_TIE)
-              updateState(game_state == PLAYER_1_MOVING ? PLAYER_2_MOVING : PLAYER_1_MOVING);
+      if (!isCpu) {
+        if (current_payload != NULL && (current_payload[0] == PLAYER_2_MOVE || current_payload[0] == PLAYER_2_QUIT)) {
+          if (current_payload[0] == PLAYER_2_QUIT) {
+            updateState(PLAYER_1_WIN);
+            isQuit = true;
+          } else {
+            pPlayerMove move = (pPlayerMove)current_payload;
+            board[move->row][move->column] = p2;
+            updateBoardDisplay();
+            totalMoves++;
+            checkWinner();
+            if (game_state != PLAYER_1_WIN && game_state != PLAYER_2_WIN && game_state != PLAYER_TIE)
+                updateState(PLAYER_1_MOVING);
+          }
         }
+      } else if (asyncDelay(2)) {
+        int row = esp_random() % 3;
+        int column = esp_random() % 3;
+        while (board[row][column] != empty) {
+            row = rand() % 3;
+            column = rand() % 3;
+        }
+        board[row][column] = p2;
+        updateBoardDisplay();
+        totalMoves++;
+        checkWinner();
+        if (game_state != PLAYER_1_WIN && game_state != PLAYER_2_WIN && game_state != PLAYER_TIE)
+          updateState(PLAYER_1_MOVING);
       }
+      
       break;
     case PLAYER_1_WIN:
       lcdPrint("Player 1 wins!", isQuit ? "Player 2 quit :(" : "", true);
@@ -298,11 +330,13 @@ void resetGame() {
   current_payload = NULL;
   isCpu = false;
   isQuit = false;
+  totalMoves = 0;
+  resetBoard();
   idleBoard();
 }
 
 void idleBoard() {
-  resetBoard();
+  resetDisplay();
   pixels[1][2] = HIGH;
   pixels[1][3] = HIGH;
   pixels[1][4] = HIGH;
@@ -327,7 +361,7 @@ void idleBoard() {
 }
 
 void updateBoardDisplay() {
-  resetBoard();
+  resetDisplay();
   for (int x = 0; x < 3; x++) {
     for (int y = 0; y < 3; y++) {
       if (board[x][y] != empty) {
@@ -344,10 +378,18 @@ void updateBoardDisplay() {
   }
 }
 
-void resetBoard() {
+void resetDisplay() {
   for (int x = 0; x < 8; x++) {
     for (int y = 0; y < 8; y++) {
       pixels[x][y] = LOW;
+    }
+  }
+}
+
+void resetBoard() {
+  for (int x = 0; x < 3; x++) {
+    for (int y = 0; y < 3; y++) {
+      board[x][y] = empty;
     }
   }
 }
