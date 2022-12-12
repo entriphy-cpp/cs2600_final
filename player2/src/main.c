@@ -107,16 +107,13 @@ int checkDiagonals() {
 
 // Updates game_state if there is a winner
 void checkWinner() {
-    if (totalMoves == 9) {
-        updateState(PLAYER_TIE);
-        return;
-    }
-
     int rowWin = checkRow(0) || checkRow(1) || checkRow(2);
     int columnWin = checkColumn(0) || checkColumn(1) || checkColumn(2);
     int diagonalWin = checkDiagonals();
     if (rowWin || columnWin || diagonalWin) {
         updateState(game_state == PLAYER_1_MOVING ? PLAYER_1_WIN : PLAYER_2_WIN);
+    } else if (totalMoves == 9) {
+        updateState(PLAYER_TIE);
     }
 }
 
