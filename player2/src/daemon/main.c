@@ -5,7 +5,8 @@
 #include "opcodes.h"
 
 int messageReceived(void* context, char* topic, int length, MQTTClient_message* message) {
-    if (strcmp(topic, TOPIC) == 0 && message->payloadlen == 1 && *((char*)message->payload) == PLAYER_1_ASK) {
+    printf("%d\n", message->payloadlen);
+    if (strcmp(topic, P2_TOPIC) == 0 && message->payloadlen == 1 && *((char*)message->payload) == PLAYER_1_ASK) {
         printf("Received PLAYER_1_ASK!\n", topic, length, message->payload);
         int res = system(getenv("EXECUTABLE"));
         printf("Executable exited with code %d.\n", res);
@@ -36,8 +37,8 @@ int main(int argc, char* argv[]) {
     printf("Connection successful!\n", ADDRESS, DAEMON_ID);
 
     // Subscribe to topic and infinitely loop
-    printf("Subscribing to %s; waiting for PLAYER_1_ASK...\n", TOPIC, DAEMON_ID);
-    MQTTClient_subscribe(client, TOPIC, QOS);
+    printf("Subscribing to %s; waiting for PLAYER_1_ASK...\n", P2_TOPIC, DAEMON_ID);
+    MQTTClient_subscribe(client, P2_TOPIC, QOS);
 
     int ch;
     do {
