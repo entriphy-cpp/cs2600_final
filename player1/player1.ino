@@ -204,18 +204,28 @@ void loop() {
       break;
     case PLAYER_1_WIN:
       lcdPrint("Player 1 wins!", "", true);
+      if (asyncDelay(5))
+        resetGame();
       break;
     case PLAYER_2_WIN:
       lcdPrint("Player 2 wins!", "", true);
+      if (asyncDelay(5))
+        resetGame();
       break;
     case PLAYER_1_QUIT:
       lcdPrint("Player 1 quit.", ":(", true);
+      if (asyncDelay(5))
+        resetGame();
       break;
     case PLAYER_2_QUIT:
       lcdPrint("Player 2 quit.", ":(", true);
+      if (asyncDelay(5))
+        resetGame();
       break;
     case PLAYER_TIE:
       lcdPrint("Tie game.", "", true);
+      if (asyncDelay(5))
+        resetGame();
       break;
   }
 
