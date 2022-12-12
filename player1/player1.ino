@@ -219,10 +219,8 @@ void loop() {
       break;
     case PLAYER_1_MOVING:
       // Wait for player to press input on remote
-      lcdPrint("Player 1 Move", "Press a # (1-9)", true);
       break;
     case PLAYER_2_MOVING:
-      lcdPrint("Player 2 Move", "Waiting...", true);
       if (!isCpu) {
         if (current_payload != NULL && (current_payload[0] == PLAYER_2_MOVE || current_payload[0] == PLAYER_2_QUIT)) {
           if (current_payload[0] == PLAYER_2_QUIT) {
@@ -255,17 +253,8 @@ void loop() {
       
       break;
     case PLAYER_1_WIN:
-      lcdPrint("Player 1 wins!", isQuit ? "Player 2 quit :(" : "", true);
-      if (asyncDelay(5))
-        resetGame();
-      break;
     case PLAYER_2_WIN:
-      lcdPrint("Player 2 wins!", isQuit ? "Player 1 quit :(" : "", true);
-      if (asyncDelay(5))
-        resetGame();
-      break;
     case PLAYER_TIE:
-      lcdPrint("Tie game.", "", true);
       if (asyncDelay(5))
         resetGame();
       break;
@@ -294,23 +283,14 @@ void callback(char *topic, byte *payload, unsigned int length) {
   }
 }
 
-const char *old_row1;
-const char *old_row2;
 void lcdPrint(const char *row1, const char *row2, int clear) {
-  if (clear && (old_row1 != row1 || old_row2 != row2))
+  if (clear)
     lcd.clear();
-  
-  if (old_row1 != row1) {
-    lcd.setCursor(0, 0);
-    lcd.print(row1);
-    old_row1 = row1;
-  }
 
-  if (old_row2 != row2) {
-    lcd.setCursor(0, 1);
-    lcd.print(row2);
-    old_row2 = row2;
-  }
+  lcd.setCursor(0, 0);
+  lcd.print(row1);
+  lcd.setCursor(0, 1);
+  lcd.print(row2);
 }
 
 int asyncDelay(int timeout) {
@@ -321,6 +301,24 @@ void updateState(enum GameState state) {
   game_state = state;
   timeout_time = millis();
   current_payload = NULL;
+
+  switch (state) {
+    case PLAYER_1_MOVING:
+      lcdPrint("Player 1 Move", "Press a # (1-9)", true);
+      break;
+    case PLAYER_2_MOVING:
+      lcdPrint("Player 2 Move", "Waiting...", true);
+      break;
+    case PLAYER_1_WIN:
+      lcdPrint("Player 1 wins!", isQuit ? "Player 2 quit :(" : "", true);
+      break;
+    case PLAYER_2_WIN:
+      lcdPrint("Player 2 wins!", isQuit ? "Player 1 quit :(" : "", true);
+      break;
+    case PLAYER_TIE:
+      lcdPrint("Tie game.", "", true);
+      break;
+  }
 }
 
 void resetGame() {
