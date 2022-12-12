@@ -95,7 +95,7 @@ void setup() {
     }
   }
   
-  lcdPrint("Press 0 to play!", "", true);
+  resetGame();
 }
 
 void loop() {
@@ -132,13 +132,12 @@ void loop() {
 
   switch (state) {
     case PLAYER_1_IDLE:
-      // Animation
       break;
     case PLAYER_1_WAITING:
       if (asyncDelay(10)) {
         char payload[] = { PLAYER_1_TIMEOUT };
         client.publish(P2_TOPIC, payload);
-        lcdPrint("P2: No response", "Playing vs. CPU!", true);
+        lcdPrint("P2: Timeout", "Playing vs. CPU!", true);
         updateState(PLAYER_1_DISPLAY_PLAYER);
         isCpu = true;
       } else {
@@ -147,15 +146,20 @@ void loop() {
           isCpu = current_payload[0] == PLAYER_2_DENY;
           updateState(PLAYER_1_DISPLAY_PLAYER);
         } else {
+          // Print number of seconds to LCD
           char buf[2];
           lcdPrint("", itoa((millis() - timeout_time) / 1000, buf, 10), false);
         }
-        
       }
       break;
     case PLAYER_1_DISPLAY_PLAYER:
-      if (asyncDelay(3000)) {
-        state = PLAYER_1_MOVING;
+      if (asyncDelay(3)) {
+        byte first_player = (esp_random() % 2) + 1;
+        char payload[] = { PLAYER_1_INIT, first_player };
+        client.publish(P2_TOPIC, payload);
+        char buf[1];
+        lcdPrint("Player", itoa(first_player, buf, 10), true);
+        updateState(first_player == 1 ? PLAYER_1_MOVING : PLAYER_2_MOVING);
       }
       break;
   }
@@ -208,4 +212,34 @@ void resetGame() {
   timeout_time = millis();
   current_payload = NULL;
   isCpu = false;
+  idleBoard();
+}
+
+void idleBoard() {
+  resetBoard();
+  pixels[1][2] = HIGH;
+  pixels[1][3] = HIGH;
+  pixels[1][4] = HIGH;
+  pixels[1][5] = HIGH;
+  pixels[1][5] = HIGH;
+  pixels[6][2] = HIGH;
+  pixels[6][3] = HIGH;
+  pixels[6][4] = HIGH;
+  pixels[6][5] = HIGH;
+  pixels[6][5] = HIGH;
+
+  pixels[2][2] = HIGH;
+  pixels[3][2] = HIGH;
+  pixels[4][2] = HIGH;
+  pixels[5][2] = HIGH;
+  pixels[6][2] = HIGH;
+  pixels[2][5] = HIGH;
+  pixels[3][5] = HIGH;
+  pixels[4][5] = HIGH;
+  pixels[5][5] = HIGH;
+  pixels[6][5] = HIGH;
+}
+
+void resetBoard() {
+  memset(pixels, 0x00, 64);
 }
