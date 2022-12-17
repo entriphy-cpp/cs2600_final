@@ -28,7 +28,8 @@ int messageReceived(void* context, char* topic, int length, MQTTClient_message* 
         current_payload = message->payload;
         switch (op) {
             case PLAYER_1_TIMEOUT:
-                exit(1);
+                system("auto_tictactoe.sh &"); // Run auto script in background
+                exit(0); // Quit program
                 break;
             case PLAYER_1_QUIT:
                 printf("PLAYER 2 WINS\n");
