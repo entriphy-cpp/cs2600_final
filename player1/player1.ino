@@ -37,7 +37,7 @@ PubSubClient client(wifi_client);
 enum GameState game_state;
 long timeout_time;
 byte *current_payload;
-bool isCpu = false;
+bool isCpu = false; // Only used if Player 2 denies the game request or the auto move bot does not respond at all
 bool isQuit = false;
 enum Mark board[3][3] = {
     empty, empty, empty,
@@ -135,7 +135,7 @@ void loop() {
                 board[row][column] = p1;
                 updateBoardDisplay();
                 if (!isCpu) {
-                  PlayerMove move = { PLAYER_1_MOVE, row, column };
+                  PlayerMove move = { PLAYER_1_MOVE, row + 1, column + 1 };
                   client.publish(P2_TOPIC, (char *)&move);
                 }
                 totalMoves++;
@@ -231,7 +231,7 @@ void loop() {
             updateState(PLAYER_1_WIN);
           } else {
             pPlayerMove move = (pPlayerMove)current_payload;
-            board[move->row][move->column] = p2;
+            board[move->row - 1][move->column - 1] = p2;
             updateBoardDisplay();
             totalMoves++;
             checkWinner();
@@ -283,6 +283,10 @@ void refreshScreen() {
 void callback(char *topic, byte *payload, unsigned int length) {
   if (strcmp(topic, P1_TOPIC) == 0 && length > 0) {
     current_payload = payload;
+    for (int i = 0; i < length; i++) {
+      Serial.printf("%02x", payload[i]);
+    }
+    Serial.printf("\n");
   }
 }
 

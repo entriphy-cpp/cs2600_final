@@ -69,18 +69,14 @@ void playerMove(pPlayerMove move) {
     int row = integerInputRange("Enter row: ", 1, 3);
     int column = integerInputRange("Enter column: ", 1, 3);
 
-    // Decrement values to make it a valid index
-    row--;
-    column--;
-
-    if (board[row][column] == empty) {
-        board[row][column] = getPlayerMark();
+    if (board[row - 1][column - 1] == empty) {
+        board[row - 1][column - 1] = getPlayerMark();
     } else {
         printf("There is already a mark at this position.\n");
         playerMove(move);
     }
 
-    board[row][column] = p2;
+    board[row - 1][column - 1] = p2;
     move->op = PLAYER_2_MOVE;
     move->row = row;
     move->column = column;
@@ -176,7 +172,7 @@ int main(int argc, char* argv[]) {
             printf("Waiting for Player 1's move...\n");
             waitForMessage();
             pPlayerMove move = (pPlayerMove)current_payload;
-            board[move->row][move->column] = p1;
+            board[move->row - 1][move->column - 1] = p1;
         } else {
             PlayerMove move;
             playerMove(&move);
